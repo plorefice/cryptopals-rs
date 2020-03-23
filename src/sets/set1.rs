@@ -40,6 +40,28 @@ pub fn xor_cipher<I: AsRef<[u8]>>(input: I) -> Result<String> {
     Ok(String::from_utf8(plaintext)?)
 }
 
+/// Set 1 - Challenge 4
+/// Detect single-character XOR
+pub fn single_character_xor<I: AsRef<[u8]>>(input: I) -> Result<String> {
+    let lines = input.as_ref().split(|&c| c == b'\n');
+
+    let mut plaintext = String::new();
+    let mut best_score = 0.0;
+
+    for line in lines {
+        if let Ok(decoded) = xor_cipher(line) {
+            let score = text::englishness(&decoded);
+
+            if score > best_score {
+                plaintext = decoded;
+                best_score = score;
+            }
+        }
+    }
+
+    Ok(plaintext)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -76,6 +98,14 @@ mod tests {
             )
             .unwrap(),
             "Cooking MC's like a pound of bacon"
+        )
+    }
+
+    #[test]
+    fn run_single_character_xor() {
+        assert_eq!(
+            single_character_xor(&include_bytes!("../../data/set1/4.txt")[..]).unwrap(),
+            "nOW\u{0}THAT\u{0}THE\u{0}PARTY\u{0}IS\u{0}JUMPING*"
         )
     }
 }
