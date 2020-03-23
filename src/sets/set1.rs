@@ -62,6 +62,19 @@ pub fn single_character_xor<I: AsRef<[u8]>>(input: I) -> Result<String> {
     Ok(plaintext)
 }
 
+/// Set 1 - Challenge 5
+/// Implement repeating-key XOR
+pub fn repeating_key_xor<I: AsRef<[u8]>>(input: I, key: I) -> String {
+    hex::encode(
+        input
+            .as_ref()
+            .into_iter()
+            .zip(key.as_ref().into_iter().cycle())
+            .map(|(c, k)| c ^ k)
+            .collect::<Vec<_>>(),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -107,5 +120,18 @@ mod tests {
             single_character_xor(&include_bytes!("../../data/set1/4.txt")[..]).unwrap(),
             "nOW\u{0}THAT\u{0}THE\u{0}PARTY\u{0}IS\u{0}JUMPING*"
         )
+    }
+
+    #[test]
+    fn run_repeating_key_xor() {
+        assert_eq!(
+            repeating_key_xor(
+                &b"Burning 'em, if you ain't quick and nimble\n\
+                I go crazy when I hear a cymbal"[..],
+                b"ICE"
+            ),
+            "0b3637272a2b2e63622c2e69692a23693a2a3c6324202d623d63343c2a26226324272765272\
+             a282b2f20430a652e2c652a3124333a653e2b2027630c692b20283165286326302e27282f"
+        );
     }
 }
