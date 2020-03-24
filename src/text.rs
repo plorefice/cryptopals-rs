@@ -14,28 +14,28 @@ const ENGLISH_LETTER_FREQUENCIES: [f32; 26] = [
 ///
 /// [Bhattacharyya Coefficient]: https://en.wikipedia.org/wiki/Bhattacharyya_distance
 pub fn englishness<T: AsRef<[u8]>>(text: T) -> f32 {
-    let letters = text
-        .as_ref()
-        .iter()
-        .filter_map(|b| {
-            if b.is_ascii_alphabetic() {
-                Some(b.to_ascii_uppercase())
-            } else {
-                None
-            }
-        })
-        .fold(vec![0; 26], |mut v, c| {
-            v[(c - b'A') as usize] += 1;
-            v
-        });
+    let text = text.as_ref();
 
-    let total = letters.iter().sum::<u32>() as f32;
+    let mut gibberish = 0;
+    let mut letters = vec![0; 26];
+
+    for c in text {
+        // Count non-printable characters and use them to skew the result towards gibberish.
+        if !c.is_ascii_graphic() && !c.is_ascii_whitespace() {
+            gibberish += 1;
+        } else if c.is_ascii_alphabetic() {
+            letters[(c.to_ascii_uppercase() - b'A') as usize] += 1;
+        }
+    }
+
+    let total = (letters.iter().sum::<u32>() + gibberish) as f32;
 
     letters
         .into_iter()
         .enumerate()
         .map(|(c, n)| f32::sqrt(ENGLISH_LETTER_FREQUENCIES[c] * (n as f32 / total)))
-        .sum()
+        .sum::<f32>()
+        * (1.0 - gibberish as f32 / total) // worsen result by the amount of gibberish
 }
 
 #[cfg(test)]
