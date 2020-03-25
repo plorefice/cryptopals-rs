@@ -1,4 +1,6 @@
-use crate::{text, Result};
+use crate::{text, utils, Result};
+
+use itertools::Itertools;
 
 /// Set 1 - Challenge 1
 /// Convert hex to base64
@@ -12,32 +14,30 @@ pub fn fixed_xor<I: AsRef<[u8]>>(a: I, b: I) -> Result<String> {
     let a = hex::decode(a)?;
     let b = hex::decode(b)?;
 
-    Ok(hex::encode(
-        a.into_iter().zip(b).map(|(a, b)| a ^ b).collect::<Vec<_>>(),
-    ))
+    Ok(hex::encode(utils::xor(a, b)))
 }
 
 /// Set 1 - Challenge 3
 /// Single-byte XOR cipher
-pub fn xor_cipher<I: AsRef<[u8]>>(input: I) -> Result<String> {
-    let input = hex::decode(input)?;
-
-    let xor_decode = |key| input.iter().map(|c| c ^ key).collect::<Vec<_>>();
-
-    let mut plaintext = Vec::new();
+pub fn xor_cipher<I: AsRef<[u8]>>(input: I) -> Result<(u8, String, f32)> {
+    let mut plaintext = String::new();
     let mut best_score = 0.0;
+    let mut best_key = 0;
 
-    for key in 0..=255 {
-        let decoded = xor_decode(key);
-        let score = text::englishness(&decoded);
+    for key in 0u8..=255 {
+        let decoded = utils::xor(input.as_ref(), &[key][..]);
 
-        if score > best_score {
-            plaintext = decoded;
-            best_score = score;
+        if let Ok(s) = String::from_utf8(decoded) {
+            let score = text::englishness(&s);
+            if score > best_score {
+                best_score = score;
+                best_key = key;
+                plaintext = s;
+            }
         }
     }
 
-    Ok(String::from_utf8(plaintext)?)
+    Ok((best_key, plaintext, best_score))
 }
 
 /// Set 1 - Challenge 4
@@ -49,9 +49,7 @@ pub fn single_character_xor<I: AsRef<[u8]>>(input: I) -> Result<String> {
     let mut best_score = 0.0;
 
     for line in lines {
-        if let Ok(decoded) = xor_cipher(line) {
-            let score = text::englishness(&decoded);
-
+        if let Ok((_, decoded, score)) = xor_cipher(hex::decode(line)?) {
             if score > best_score {
                 plaintext = decoded;
                 best_score = score;
@@ -65,14 +63,79 @@ pub fn single_character_xor<I: AsRef<[u8]>>(input: I) -> Result<String> {
 /// Set 1 - Challenge 5
 /// Implement repeating-key XOR
 pub fn repeating_key_xor<I: AsRef<[u8]>>(input: I, key: I) -> String {
-    hex::encode(
+    hex::encode(utils::xor(input, key))
+}
+
+/// Set 1 - Challenge 6
+/// Break repeating-key XOR
+pub fn break_repeating_key_xor<I: AsRef<[u8]>>(input: I) -> Result<String> {
+    let input = input.as_ref();
+
+    // Decode input as base64 (after removing newlines)
+    let input = base64::decode(
         input
-            .as_ref()
-            .into_iter()
-            .zip(key.as_ref().into_iter().cycle())
-            .map(|(c, k)| c ^ k)
+            .iter()
+            .cloned()
+            .filter(|&c| c != b'\n')
             .collect::<Vec<_>>(),
-    )
+    )?;
+
+    // Compute likely keysizes by computing the normalized hamming distance
+    // over `n_chunks` chunks, and taking the 3 sizes with higher score (lower distance).
+    let n_chunks = 4;
+    let sizes = (2..40)
+        .map(|ks| {
+            let chunks = input.chunks(ks);
+            (
+                ks,
+                chunks
+                    .clone()
+                    .take(n_chunks)
+                    .zip(chunks.skip(1).take(n_chunks))
+                    .map(|(a, b)| utils::hamming(a, b) as f32)
+                    .sum::<f32>()
+                    / n_chunks as f32
+                    / ks as f32,
+            )
+        })
+        .sorted_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
+        .map(|(x, _)| x)
+        .take(3)
+        .collect::<Vec<_>>();
+
+    // For each likely keysize...
+    let key = sizes
+        .into_iter()
+        .map(|sz| {
+            // Transpose the blocks
+            let blocks = (0..sz)
+                .map(|i| {
+                    input
+                        .iter()
+                        .skip(i)
+                        .step_by(sz)
+                        .cloned()
+                        .collect::<Vec<_>>()
+                })
+                .collect::<Vec<_>>();
+
+            // Obtain the likely key by breaking single-byte XOR for each block
+            let key = blocks
+                .into_iter()
+                .map(|block| xor_cipher(block).unwrap().0)
+                .collect::<Vec<_>>();
+
+            // Compute the final score on the deciphered text
+            let score = text::englishness(utils::xor(&input, &key));
+
+            (key, score)
+        })
+        .sorted_by(|a, b| b.1.partial_cmp(&a.1).unwrap())
+        .nth(0)
+        .unwrap()
+        .0;
+
+    Ok(String::from_utf8(key)?)
 }
 
 #[cfg(test)]
@@ -107,9 +170,13 @@ mod tests {
     fn run_xor_cipher() {
         assert_eq!(
             xor_cipher(
-                &b"1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736"[..]
+                hex::decode(
+                    &b"1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736"[..]
+                )
+                .unwrap()
             )
-            .unwrap(),
+            .unwrap()
+            .1,
             "Cooking MC's like a pound of bacon"
         )
     }
@@ -118,7 +185,7 @@ mod tests {
     fn run_single_character_xor() {
         assert_eq!(
             single_character_xor(&include_bytes!("../../data/set1/4.txt")[..]).unwrap(),
-            "nOW\u{0}THAT\u{0}THE\u{0}PARTY\u{0}IS\u{0}JUMPING*"
+            "Now that the party is jumping\n"
         )
     }
 
@@ -133,5 +200,13 @@ mod tests {
             "0b3637272a2b2e63622c2e69692a23693a2a3c6324202d623d63343c2a26226324272765272\
              a282b2f20430a652e2c652a3124333a653e2b2027630c692b20283165286326302e27282f"
         );
+    }
+
+    #[test]
+    fn run_breaking_repeating_key_xor() {
+        assert_eq!(
+            break_repeating_key_xor(&include_bytes!("../../data/set1/6.txt")[..]).unwrap(),
+            "Terminator X: Bring the noise"
+        )
     }
 }
