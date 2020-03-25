@@ -1,3 +1,19 @@
+use crate::Result;
+
+/// Decodes Base64-encoded data, and returns the decoded bytes.
+///
+/// The input is sanitized before decoding.
+pub fn from_base64<I: AsRef<[u8]>>(input: I) -> Result<Vec<u8>> {
+    Ok(base64::decode(
+        input
+            .as_ref()
+            .iter()
+            .cloned()
+            .filter(|c| !c.is_ascii_whitespace())
+            .collect::<Vec<_>>(),
+    )?)
+}
+
 /// Computes the Hamming (or edit) distance between two byte slices.
 ///
 /// The Hamming distance is just the number of differing bits between

@@ -1,6 +1,7 @@
 use crate::{text, utils, Result};
 
 use itertools::Itertools;
+use openssl::symm::{self, Cipher};
 
 /// Set 1 - Challenge 1
 /// Convert hex to base64
@@ -69,16 +70,7 @@ pub fn repeating_key_xor<I: AsRef<[u8]>>(input: I, key: I) -> String {
 /// Set 1 - Challenge 6
 /// Break repeating-key XOR
 pub fn break_repeating_key_xor<I: AsRef<[u8]>>(input: I) -> Result<String> {
-    let input = input.as_ref();
-
-    // Decode input as base64 (after removing newlines)
-    let input = base64::decode(
-        input
-            .iter()
-            .cloned()
-            .filter(|&c| c != b'\n')
-            .collect::<Vec<_>>(),
-    )?;
+    let input = utils::from_base64(input)?;
 
     // Compute likely keysizes by computing the normalized hamming distance
     // over `n_chunks` chunks, and taking the 3 sizes with higher score (lower distance).
@@ -136,6 +128,19 @@ pub fn break_repeating_key_xor<I: AsRef<[u8]>>(input: I) -> Result<String> {
         .0;
 
     Ok(String::from_utf8(key)?)
+}
+
+/// Set 1 - Challenge 7
+/// AES in ECB mode
+pub fn aes_in_ecb_mode<I: AsRef<[u8]>>(input: I) -> Result<String> {
+    let input = utils::from_base64(input)?;
+
+    Ok(String::from_utf8(symm::decrypt(
+        Cipher::aes_128_ecb(),
+        b"YELLOW SUBMARINE",
+        None,
+        &input,
+    )?)?)
 }
 
 #[cfg(test)]
@@ -208,5 +213,14 @@ mod tests {
             break_repeating_key_xor(&include_bytes!("../../data/set1/6.txt")[..]).unwrap(),
             "Terminator X: Bring the noise"
         )
+    }
+
+    #[test]
+    fn run_aes_in_ecb_mode() {
+        assert!(
+            aes_in_ecb_mode(&include_bytes!("../../data/set1/7.txt")[..],)
+                .unwrap()
+                .contains("Play that funky music")
+        );
     }
 }
