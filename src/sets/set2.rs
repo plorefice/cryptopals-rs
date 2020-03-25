@@ -1,9 +1,9 @@
-use crate::utils;
+use crate::crypto::misc;
 
 /// Set 2 - Challenge 1
 /// Implement PKCS#7 padding
 pub fn implement_pkcs7_padding<I: AsRef<[u8]>>(input: I) -> Vec<u8> {
-    utils::pkcs7(input, 20)
+    misc::pkcs7(input, 20)
 }
 
 #[cfg(test)]

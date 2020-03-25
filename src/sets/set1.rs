@@ -1,4 +1,4 @@
-use crate::{text, utils, Result};
+use crate::{crypto::misc, text, utils, Result};
 
 use itertools::Itertools;
 use openssl::symm::{self, Cipher};
@@ -15,7 +15,7 @@ pub fn fixed_xor<I: AsRef<[u8]>>(a: I, b: I) -> Result<String> {
     let a = hex::decode(a)?;
     let b = hex::decode(b)?;
 
-    Ok(hex::encode(utils::xor(a, b)))
+    Ok(hex::encode(misc::xor(a, b)))
 }
 
 /// Set 1 - Challenge 3
@@ -26,7 +26,7 @@ pub fn xor_cipher<I: AsRef<[u8]>>(input: I) -> Result<(u8, String, f32)> {
     let mut best_key = 0;
 
     for key in 0u8..=255 {
-        let decoded = utils::xor(input.as_ref(), &[key][..]);
+        let decoded = misc::xor(input.as_ref(), &[key][..]);
 
         if let Ok(s) = String::from_utf8(decoded) {
             let score = text::englishness(&s);
@@ -64,7 +64,7 @@ pub fn single_character_xor<I: AsRef<[u8]>>(input: I) -> Result<String> {
 /// Set 1 - Challenge 5
 /// Implement repeating-key XOR
 pub fn repeating_key_xor<I: AsRef<[u8]>>(input: I, key: I) -> String {
-    hex::encode(utils::xor(input, key))
+    hex::encode(misc::xor(input, key))
 }
 
 /// Set 1 - Challenge 6
@@ -118,7 +118,7 @@ pub fn break_repeating_key_xor<I: AsRef<[u8]>>(input: I) -> Result<String> {
                 .collect::<Vec<_>>();
 
             // Compute the final score on the deciphered text
-            let score = text::englishness(utils::xor(&input, &key));
+            let score = text::englishness(misc::xor(&input, &key));
 
             (key, score)
         })

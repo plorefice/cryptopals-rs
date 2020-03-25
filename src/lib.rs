@@ -1,5 +1,6 @@
 use std::{error::Error, result};
 
+pub mod crypto;
 pub mod sets;
 pub mod text;
 pub mod utils;
