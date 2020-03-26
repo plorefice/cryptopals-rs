@@ -25,9 +25,26 @@ pub fn pkcs7<I: AsRef<[u8]>>(input: I, size: u8) -> Vec<u8> {
     input
 }
 
+/// Returns a cipher's block size.
+pub fn discover_block_size<F>(f: F) -> usize
+where
+    F: Fn(&[u8]) -> Vec<u8>,
+{
+    let base_len = f(&[0]).len();
+
+    for i in 2.. {
+        let len = f(&vec![0; i]).len();
+        if len != base_len {
+            return len - base_len;
+        }
+    }
+    panic!("Block size never changed!");
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::crypto::aes::ecb;
 
     #[test]
     fn pkcs7_works() {
@@ -40,6 +57,14 @@ mod tests {
         assert_eq!(
             pkcs7(b"00000000", 8),
             b"00000000\x08\x08\x08\x08\x08\x08\x08\x08"
+        );
+    }
+
+    #[test]
+    fn discover_block_size_works() {
+        assert_eq!(
+            discover_block_size(|i| ecb::encrypt(i, b"YELLOW SUBMARINE", true).unwrap()),
+            16
         );
     }
 }

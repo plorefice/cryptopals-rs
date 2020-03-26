@@ -1,6 +1,6 @@
-use crate::Result;
+use crate::{utils, Result};
 
-use rand::{distributions::Standard, random, thread_rng, Rng};
+use rand::{distributions::Standard, random, rngs::StdRng, thread_rng, Rng, SeedableRng};
 
 pub mod ecb {
     use super::Result;
@@ -116,6 +116,12 @@ fn random_key() -> [u8; 16] {
     rand::random()
 }
 
+/// Generates a random AES-128 key from the specified seed.
+fn seeded_key(seed: u64) -> [u8; 16] {
+    let mut rng = StdRng::seed_from_u64(seed);
+    rng.gen()
+}
+
 /// Generates a random number of bytes in the range `[min, max]`.
 fn random_bytes(min: usize, max: usize) -> Vec<u8> {
     thread_rng()
@@ -150,6 +156,30 @@ pub fn encrypt_random<I: AsRef<[u8]>>(input: I) -> Result<(bool, Vec<u8>)> {
     };
 
     Ok(res)
+}
+
+/// Encrypts data with AES-128-ECB using a random key generated from the seed.
+///
+/// The input is affixed with a fixed, unknown string before encryption.
+pub fn encrypt_seeded<I: AsRef<[u8]>>(input: I, seed: u64) -> Result<Vec<u8>> {
+    let mut input = input.as_ref().to_vec();
+
+    // Trailing unknown text that we need to decrypt
+    let suffix = utils::from_base64(
+        "Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkg\
+         aGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBq\
+         dXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUg\
+         YnkK",
+    )?;
+
+    // Generate encryption key from seed
+    let key = seeded_key(seed);
+
+    // Append suffix to the input
+    input.extend(suffix);
+
+    // Encrypt using ECB
+    ecb::encrypt(input, key, true)
 }
 
 /// Returns whether the input was encryptd using ECB.
