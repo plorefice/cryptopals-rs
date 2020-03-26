@@ -59,10 +59,10 @@ pub mod cbc {
         I: AsRef<[u8]>,
         K: AsRef<[u8]>,
     {
-        let input = input.as_ref();
         let key = key.as_ref();
         let n = key.len();
 
+        let input = misc::pkcs7(input.as_ref(), n as u8);
         let iv = iv.map(|iv| iv.to_owned()).unwrap_or(vec![0; n]);
 
         let mut ciphertext = Vec::with_capacity(input.len());
@@ -127,8 +127,11 @@ fn random_bytes(min: usize, max: usize) -> Vec<u8> {
 /// Encrypts data with AES-128 using random parameters.
 ///
 /// The data is first prefixed and suffixed with 5-10 random bytes each.
-/// It is then encrypted using ECB or CBC (with random IVs) with equal probability.
-pub fn encrypt_random<I: AsRef<[u8]>>(input: I) -> Result<Vec<u8>> {
+/// It is then encrypted with a randomly chosen key, using either ECB
+/// or CBC (with random IVs) with equal probability.
+///
+/// Returns whether ECB was used, and the encrypted data.
+pub fn encrypt_random<I: AsRef<[u8]>>(input: I) -> Result<(bool, Vec<u8>)> {
     let mut input = input.as_ref().to_vec();
 
     // Generate random encryption key and IVs
@@ -140,13 +143,22 @@ pub fn encrypt_random<I: AsRef<[u8]>>(input: I) -> Result<Vec<u8>> {
     input.extend(random_bytes(5, 10));
 
     // Encrypt half the time using ECB and half the time using CBC
-    let blob = if random::<bool>() {
-        ecb::encrypt(input, key, true)?
+    let res = if random::<bool>() {
+        (true, ecb::encrypt(input, key, true)?)
     } else {
-        cbc::encrypt(input, key, Some(&iv))?
+        (false, cbc::encrypt(input, key, Some(&iv))?)
     };
 
-    Ok(blob)
+    Ok(res)
+}
+
+/// Returns whether the input was encryptd using ECB.
+pub fn is_ecb_encrypted<I: AsRef<[u8]>>(input: I) -> bool {
+    input
+        .as_ref()
+        .chunks(16)
+        .zip(input.as_ref().chunks(16).skip(1))
+        .any(|(a, b)| a == b)
 }
 
 #[cfg(test)]
