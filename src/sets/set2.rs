@@ -6,6 +6,8 @@ use crate::{
     utils, Result,
 };
 
+use std::collections::HashMap;
+
 /// Set 2 - Challenge 9
 /// Implement PKCS#7 padding
 pub fn implement_pkcs7_padding<I: AsRef<[u8]>>(input: I) -> Vec<u8> {
@@ -88,6 +90,51 @@ pub fn byte_at_a_time_ecb_decryption() -> Result<String> {
     Ok(String::from_utf8(deciphered)?)
 }
 
+/// Set 2 - Challenge 13
+/// ECB cut-and-paste
+pub fn ecb_cut_and_paste() -> Result<HashMap<String, String>> {
+    // Random AES key that will be used for the challenge
+    let key = aes::random_key();
+
+    // Given an email, produces a valid ciphertext for that email
+    let oracle = |email: &str| aes::ecb::encrypt(utils::profile_for(email), key, true);
+
+    // Given a valid ciphertext, produces the kv-encoded profile
+    let decrypt = |ct: &[u8]| -> Result<_> {
+        utils::parse_kv_encoded(String::from_utf8(aes::ecb::decrypt(ct, key, true)?)?)
+    };
+
+    // Let's assume AES-128-ECB, which means 16-byte blocks.
+    //
+    // In order to craft a ciphertext which will decrypt into an admin role, we
+    // need to know how to encrypt the 'admin' string, correctly padded. This is
+    // the plaintext we need to encrypt:
+    //
+    // admin\u{b}\u{b}\u{b}\u{b}\u{b}\u{b}\u{b}\u{b}\u{b}\u{b}\u{b}
+    //
+    // This can be achieved by crafting an email which puts the above string
+    // in its own block.
+
+    let malicious_mail = "foooooooo@admin\u{b}\u{b}\u{b}\u{b}\u{b}\u{b}\u{b}\u{b}\u{b}\u{b}\u{b}";
+    let crafted_block = oracle(malicious_mail)?[16..32].to_vec();
+
+    // Once we have this building block, all we need to do is craft an email
+    // long enough that the 'admin' string is in its own (last) block.
+    //
+    // An email that matches this criterion is, appropriately, break@dat.com.
+
+    let crafted_mail = "break@dat.com";
+    let valid_blocks = oracle(crafted_mail)?[..32].to_vec();
+
+    // Finally we stitch together the desired ciphertext.
+
+    let crafted_ciphertext = [valid_blocks, crafted_block].concat();
+
+    // Decrypting this ciphertext gives us an admin profile.
+
+    Ok(decrypt(&crafted_ciphertext)?)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -126,5 +173,10 @@ mod tests {
              Did you stop? No, I just drove by\n\
              \u{1}\u{0}\u{0}\u{0}\u{0}\u{0}"
         );
+    }
+
+    #[test]
+    fn run_ecb_cut_and_paste() {
+        assert_eq!(ecb_cut_and_paste().unwrap()["role"], "admin");
     }
 }

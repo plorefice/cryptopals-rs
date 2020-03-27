@@ -112,12 +112,12 @@ pub mod cbc {
 }
 
 /// Generates a random AES-128 key.
-fn random_key() -> [u8; 16] {
+pub fn random_key() -> [u8; 16] {
     rand::random()
 }
 
 /// Generates a random AES-128 key from the specified seed.
-fn seeded_key(seed: u64) -> [u8; 16] {
+pub fn seeded_key(seed: u64) -> [u8; 16] {
     let mut rng = StdRng::seed_from_u64(seed);
     rng.gen()
 }
