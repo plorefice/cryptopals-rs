@@ -6,13 +6,13 @@ use crate::{
     utils, Result,
 };
 
-/// Set 2 - Challenge 1
+/// Set 2 - Challenge 9
 /// Implement PKCS#7 padding
 pub fn implement_pkcs7_padding<I: AsRef<[u8]>>(input: I) -> Vec<u8> {
     misc::pkcs7(input, 20)
 }
 
-/// Set 2 - Challenge 2
+/// Set 2 - Challenge 10
 /// Implement CBC mode
 pub fn implement_cbc_mode<I: AsRef<[u8]>>(input: I) -> Result<String> {
     Ok(String::from_utf8(cbc::decrypt(
@@ -22,7 +22,7 @@ pub fn implement_cbc_mode<I: AsRef<[u8]>>(input: I) -> Result<String> {
     )?)?)
 }
 
-/// Set 2 - Challenge 3
+/// Set 2 - Challenge 11
 /// An ECB/CBC detection oracle
 pub fn ecb_cbc_detection_oracle() -> Result<bool> {
     let test_vec = vec![0x42_u8; 48];
@@ -37,7 +37,7 @@ pub fn ecb_cbc_detection_oracle() -> Result<bool> {
     Ok(true)
 }
 
-/// Set 2 - Challenge 4
+/// Set 2 - Challenge 12
 /// Byte-at-a-time ECB decryption (Simple)
 pub fn byte_at_a_time_ecb_decryption() -> Result<String> {
     // The oracle function that we will use to crack the encryption
